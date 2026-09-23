@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mergulho Solar</title>
+<meta name="description" content="Pilote uma sonda pela coroa do Sol, desvie de plasma e chegue mais perto da estrela do que a Parker Solar Probe.">
+<meta name="theme-color" content="#0b0507">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;600&display=swap">
+</head>
+<body>
+<!-- app:start -->
+<div id="app">
+  <canvas id="scene" aria-label="Túnel de plasma da coroa solar"></canvas>
+
+  <div id="hud" class="hud" hidden>
+    <div class="hud-top">
+      <div class="readout">
+        <span class="label">Distância ao centro do Sol</span>
+        <span class="value xl"><span id="hud-depth">20,00</span><small>R☉</small></span>
+        <div class="parker" aria-hidden="true">
+          <div class="parker-track"><div class="parker-fill" id="hud-parker-fill"></div></div>
+          <span class="parker-label" id="hud-parker">Parker 9,86 R☉</span>
+        </div>
+      </div>
+      <div class="readout align-end">
+        <span class="label">Pontos</span>
+        <span class="value xl" id="hud-score">0</span>
+        <span class="combo" id="hud-combo">×1</span>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <div class="hud-bottom">
+      <div class="readout">
+        <span class="label">Velocidade</span>
+        <span class="value md"><span id="hud-speed">122</span><small>km/s</small></span>
+      </div>
+      <div class="heat">
+        <div class="heat-head">
+          <span class="label">Escudo térmico</span>
+          <span class="value sm" id="hud-shield">540 °C</span>
+        </div>
+        <div class="heat-bar"><div class="heat-fill" id="hud-heat"></div></div>
+      </div>
+      <div class="readout align-end">
+        <span class="label">Coroa</span>
+        <span class="value md"><span id="hud-corona">0,9</span><small>MK</small></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="corner-controls">
+    <button type="button" id="btn-pause" class="ghost" hidden>Pausar</button>
+    <button type="button" id="btn-sound" class="ghost" aria-pressed="true">Som ligado</button>
+  </div>
+
+  <section id="screen-title" class="screen">
+    <div class="screen-inner">
+      <p class="eyebrow">Missão Ícaro-1 · coroa solar</p>
+      <h1 class="title">Mergulho<br>Solar</h1>
+      <p class="lede">Pilote uma sonda pela coroa do Sol. Desvie dos arcos e filamentos de plasma, colete criocélulas para resfriar o escudo e chegue mais perto da estrela do que a Parker Solar Probe, que passou a 9,86 raios solares do centro em dezembro de 2024.</p>
+      <div class="actions">
+        <button type="button" id="btn-start" class="primary">Iniciar mergulho</button>
+        <span class="best" id="best-line"></span>
+      </div>
+      <dl class="legend">
+        <div><dt><i class="swatch plasma"></i>Plasma</dt><dd>Arcos, filamentos e plasmoides aquecem o escudo em 30%.</dd></div>
+        <div><dt><i class="swatch coolant"></i>Criocélula</dt><dd>Resfria o escudo em 22% e aumenta o multiplicador.</dd></div>
+        <div><dt><i class="swatch graze"></i>Rasante</dt><dd>Passar raspando no plasma rende pontos e multiplicador.</dd></div>
+      </dl>
+      <p class="keys"><kbd>Mouse</kbd> ou <kbd>arraste o dedo</kbd> ou <kbd>WASD</kbd> para pilotar · <kbd>Esc</kbd> pausa</p>
+    </div>
+  </section>
+
+  <section id="screen-pause" class="screen" hidden>
+    <div class="screen-inner narrow">
+      <p class="eyebrow">Mergulho em pausa</p>
+      <h2 class="title md">Pausa</h2>
+      <div class="actions">
+        <button type="button" id="btn-resume" class="primary">Continuar</button>
+        <button type="button" id="btn-quit" class="ghost">Abortar missão</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-over" class="screen" hidden>
+    <div class="screen-inner">
+      <p class="eyebrow" id="over-eyebrow">Telemetria final</p>
+      <h2 class="title md" id="over-title">Escudo térmico rompido</h2>
+      <p class="lede" id="over-verdict"></p>
+      <dl class="stats">
+        <div><dt>Menor distância</dt><dd id="st-depth">—</dd></div>
+        <div><dt>Pontos</dt><dd id="st-score">—</dd></div>
+        <div><dt>Velocidade máxima</dt><dd id="st-speed">—</dd></div>
+        <div><dt>Tempo de mergulho</dt><dd id="st-time">—</dd></div>
+        <div><dt>Criocélulas</dt><dd id="st-cells">—</dd></div>
+        <div><dt>Rasantes</dt><dd id="st-grazes">—</dd></div>
+      </dl>
+      <div class="actions">
+        <button type="button" id="btn-retry" class="primary">Mergulhar de novo</button>
+        <button type="button" id="btn-menu" class="ghost">Menu</button>
+      </div>
+    </div>
+  </section>
+</div>
+<!-- app:end -->
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

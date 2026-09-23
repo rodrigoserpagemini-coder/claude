@@ -1,0 +1,20 @@
+{
+  "name": "mergulho-solar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jogo WebGL em three.js: pilote uma sonda pela coroa do Sol.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:single": "node scripts/build-single.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "vite": "^8.3.0"
+  }
+}
