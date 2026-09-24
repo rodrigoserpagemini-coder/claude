@@ -67,11 +67,11 @@ const LensShader = {
 
       // Crepuscular rays: march toward the sun, accumulating bright samples.
       if (uRays > 0.001) {
-        vec2 toSun = (uSun - uv) / 18.0;
+        vec2 toSun = (uSun - uv) / 12.0;
         vec2 p = uv + toSun * jitter;
         float decay = 1.0;
         vec3 rays = vec3(0.0);
-        for (int i = 0; i < 18; i++) {
+        for (int i = 0; i < 12; i++) {
           vec3 s = texture2D(tDiffuse, p).rgb;
           // Only the photosphere emits shafts: mask samples to the sun's disc,
           // so anything drawn in front of it (hazards, the probe, the canopy)
@@ -80,10 +80,10 @@ const LensShader = {
           float disc = smoothstep(0.22, 0.04, length(fromSun));
           float l = max(dot(s, vec3(0.3, 0.5, 0.2)) - 1.0, 0.0) * disc;
           rays += s * l * decay;
-          decay *= 0.94;
+          decay *= 0.92;
           p += toSun;
         }
-        col += rays * uRays * 0.03;
+        col += rays * uRays * 0.04;
       }
 
       float edge = smoothstep(0.35, 1.0, r);
@@ -92,7 +92,7 @@ const LensShader = {
 
       col *= 1.0 - smoothstep(0.35, 1.25, r * uVignette);
       col += vec3(1.0, 0.45, 0.25) * uFlash;
-      col += (jitter - 0.5) * 0.035;
+      col += (jitter - 0.5) * 0.01;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }
   `,

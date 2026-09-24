@@ -1,5 +1,5 @@
 import {
-  BoxGeometry, CanvasTexture, Color, CylinderGeometry, Group, InstancedMesh, Matrix4,
+  BoxGeometry, CanvasTexture, Color, LinearFilter, LinearMipmapLinearFilter, CylinderGeometry, Group, InstancedMesh, Matrix4,
   Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, PointLight, ShaderMaterial,
   SRGBColorSpace, Vector2, Vector3,
 } from 'three';
@@ -19,6 +19,9 @@ function canvasTexture(w, h) {
   c.width = w; c.height = h;
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
+  // Mipmaps blur small text at this viewing distance; plain linear stays crisp.
+  t.generateMipmaps = false;
+  t.minFilter = LinearFilter;
   return { canvas: c, ctx: c.getContext('2d'), tex: t };
 }
 
@@ -61,6 +64,11 @@ function dashboardTexture() {
     ctx.beginPath(); ctx.moveTo(x, 256); ctx.lineTo(x + 14, 256); ctx.lineTo(x + 44, 226); ctx.lineTo(x + 30, 226); ctx.fill();
   }
   ctx.restore();
+  // The panel is seen at a steep, shrinking angle: keep mipmaps so its fine
+  // texture doesn't shimmer.
+  tex.generateMipmaps = true;
+  tex.minFilter = LinearMipmapLinearFilter;
+  tex.anisotropy = 4;
   return tex;
 }
 
@@ -81,6 +89,7 @@ export class Cockpit {
 
     this.mats = {
       strut: new MeshStandardMaterial({ color: '#1c1917', roughness: 0.45, metalness: 0.7 }),
+      matte: new MeshStandardMaterial({ color: '#0e0b0a', roughness: 0.95, metalness: 0.0 }),
       trim: new MeshStandardMaterial({ color: '#4a4038', roughness: 0.3, metalness: 0.9 }),
       led: new MeshStandardMaterial({ color: '#000000', emissive: '#ff7a2e', emissiveIntensity: 1.6 }),
       dash: new MeshStandardMaterial({ map: dashboardTexture(), roughness: 0.7, metalness: 0.3 }),
@@ -134,11 +143,11 @@ export class Cockpit {
           vec2 qa = q * vec2(uAspect, 1.0);
           float edge = smoothstep(0.55, 1.15, length(q * vec2(0.85, 1.0)));
 
-          // Soot and ablation from the corona, heavier as the shield heats.
-          float soot = fbm3(vec3(q * 3.5, 1.7)) * 0.5 + 0.5;
-          float dirt = edge * smoothstep(0.4, 0.85, soot) * (0.12 + uHeat * 0.35);
+          // Scorching creeps in from the corners of the pane as the shield
+          // heats: a smooth gradient, never a mottled pattern over the view.
+          float corner = smoothstep(0.95, 1.45, length(q * vec2(0.9, 1.0)));
           vec3 col = vec3(0.05, 0.02, 0.015);
-          float alpha = dirt * 0.85;
+          float alpha = corner * (0.1 + uHeat * 0.3);
 
           // Sheen streak.
           float sheen = smoothstep(0.03, 0.0, abs(q.x * 0.5 + q.y - 0.9)) * 0.06;
@@ -251,17 +260,17 @@ export class Cockpit {
     body.position.set(0, dashTop - dashH / 2, -D - 0.201);
     const face = new Mesh(new PlaneGeometry(hw * 2.3, dashH), this.mats.dash);
     face.position.set(0, dashTop - dashH / 2, -D);
-    const shelf = new Mesh(new BoxGeometry(hw * 2.4, 0.012, 0.42), this.mats.strut);
+    const shelf = new Mesh(new BoxGeometry(hw * 2.4, 0.012, 0.42), this.mats.matte);
     shelf.position.set(0, dashTop + 0.004, -D - 0.2);
     this.frame.add(body, face, shelf);
 
     // Screens: radar | telemetry | systems, scaled to fit narrow views.
-    const sH = 0.3 * hh;
+    const sH = 0.36 * hh;
     const sizes = { radar: [sH, sH], tele: [sH * 2, sH], sys: [sH, sH] };
     const gap = sH * 0.18;
     const total = sH * 4 + gap * 2;
     const scale = Math.min(1, (hw * 1.9) / total);
-    const cy = dashTop - dashH * 0.42;
+    const cy = dashTop - dashH * 0.4;
     let x = -total * scale / 2;
     for (const key of ['radar', 'tele', 'sys']) {
       const [w, h] = sizes[key].map((v) => v * scale);
@@ -274,7 +283,7 @@ export class Cockpit {
     }
 
     // Binnacle hood over the centre display.
-    const hood = new Mesh(new CylinderGeometry(sH * scale * 1.15, sH * scale * 1.15, 0.12, 24, 1, true, -Math.PI / 2, Math.PI), this.mats.strut);
+    const hood = new Mesh(new CylinderGeometry(sH * scale * 1.15, sH * scale * 1.15, 0.12, 24, 1, true, -Math.PI / 2, Math.PI), this.mats.matte);
     hood.rotation.x = -Math.PI / 2; // open half-cylinder arching upward
     hood.scale.set(1.05, 1, 0.35);
     hood.position.set(0, dashTop - 0.002, -D - 0.06);

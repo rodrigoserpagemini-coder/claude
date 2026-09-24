@@ -52,7 +52,11 @@ export class Streaks {
           z += aTail * len;
           vec3 p = vec3(cos(aSeed.x) * aSeed.y, sin(aSeed.x) * aSeed.y, z);
           vA = (1.0 - aTail) * smoothstep(-uSpan + 16.0, -uSpan + 90.0, z) * smoothstep(16.0, 4.0, z);
-          gl_Position = projectionMatrix * viewMatrix * vec4(applyBend(p), 1.0);
+          vec4 mv = viewMatrix * vec4(applyBend(p), 1.0);
+          // Fade lines that pass right by the camera (the cockpit sits on the
+          // probe), otherwise one sweeps across the view as a white beam.
+          vA *= smoothstep(4.0, 16.0, -mv.z);
+          gl_Position = projectionMatrix * mv;
         }
       `,
       fragmentShader: /* glsl */ `

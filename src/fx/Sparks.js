@@ -46,8 +46,9 @@ export class Sparks {
         varying float vA;
         void main() {
           vCol = color;
-          vA = aAlpha;
           vec4 mv = viewMatrix * vec4(applyBend(position), 1.0);
+          // Particles spawned at the probe would fill the view from the cockpit.
+          vA = aAlpha * smoothstep(0.8, 2.5, -mv.z);
           gl_PointSize = aSize * uScale / max(-mv.z, 0.1);
           gl_Position = projectionMatrix * mv;
         }

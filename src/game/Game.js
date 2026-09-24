@@ -381,7 +381,7 @@ export class Game {
     const avg = p.acc / p.frames;
     p.acc = 0; p.frames = 0;
     let next = this.pixelRatio;
-    if (avg > 1 / 48 && next > 0.5) next = Math.max(0.5, next * 0.85);
+    if (avg > 1 / 40 && next > 0.75) next = Math.max(0.75, next * 0.9);
     else if (avg < 1 / 58 && next < this.maxPixelRatio) next = Math.min(this.maxPixelRatio, next * 1.08);
     if (Math.abs(next - this.pixelRatio) > 0.01) {
       this.pixelRatio = next;
@@ -594,11 +594,11 @@ export class Game {
 
     const alarm = playing && r.heat > 78;
     this.post.update(this.time, {
-      aberration: 0.0016 + speedN * 0.002 + this.shake * 0.012 + this.stormLevel * 0.002,
+      aberration: (0.0016 + speedN * 0.002 + this.shake * 0.012 + this.stormLevel * 0.002) * (cockpit ? 0.35 : 1),
       shimmer: heatN * heatN * 1.4 + this.flash * 0.6,
       flash: this.flash * 0.25,
       bloom: (0.55 + depth * 0.15 + this.flash * 0.5 + this.stormLevel * 0.2) * (cockpit ? 0.7 : 1),
-      rays: (0.7 + depth * 0.6 + (cockpit ? 0.4 : 0)) * sunOnScreen,
+      rays: (0.7 + depth * 0.6) * (cockpit ? 0.45 : 1) * sunOnScreen,
       sun: sunUv,
       zoom: (this.boostMult - 1) / (PACE.boostMult - 1) * 0.9,
       alarm: alarm ? 0.6 + 0.4 * Math.sin(this.time * 10) : 0,
