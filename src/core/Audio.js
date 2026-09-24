@@ -56,6 +56,20 @@ export class Audio {
     this.rushGain.gain.value = 0.05;
     noise.connect(this.rushFilter).connect(this.rushGain).connect(this.master);
     noise.start();
+
+    // Boost roar: a separate noise voice, high-passed, faded in while boosting.
+    const roar = ctx.createBufferSource();
+    roar.buffer = this.noiseBuf;
+    roar.loop = true;
+    this.roarFilter = ctx.createBiquadFilter();
+    this.roarFilter.type = 'bandpass';
+    this.roarFilter.frequency.value = 900;
+    this.roarFilter.Q.value = 1.4;
+    this.roarGain = ctx.createGain();
+    this.roarGain.gain.value = 0;
+    roar.connect(this.roarFilter).connect(this.roarGain).connect(this.master);
+    roar.start(0, 0.7);
+    this.alarmIn = 0;
   }
 
   setMuted(m) {
@@ -64,9 +78,16 @@ export class Audio {
   }
 
   // speed and heat in [0, 1].
-  update(speed, heat) {
+  update(speed, heat, { boosting = false, alarm = false, dt = 0 } = {}) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    this.roarGain.gain.setTargetAtTime(boosting ? 0.2 : 0, t, boosting ? 0.08 : 0.25);
+    this.roarFilter.frequency.setTargetAtTime(boosting ? 1500 + speed * 1500 : 700, t, 0.3);
+    this.alarmIn -= dt;
+    if (alarm && this.alarmIn <= 0) {
+      this.alarmIn = 0.55;
+      this.tone(1180, 0.12, { type: 'square', gain: 0.06 });
+    }
     this.droneFilter.frequency.setTargetAtTime(240 + speed * 900 + heat * 500, t, 0.25);
     this.rushFilter.frequency.setTargetAtTime(420 + speed * 1600, t, 0.3);
     this.rushGain.gain.setTargetAtTime(0.03 + heat * 0.09, t, 0.3);
@@ -127,6 +148,32 @@ export class Audio {
   breach() {
     this.noise(2.4, { freq: 2600, gain: 0.7, sweep: 0.03 });
     this.tone(70, 2.0, { type: 'sawtooth', gain: 0.35, slide: 0.3 });
+  }
+
+  energy() {
+    this.tone(330, 0.3, { type: 'sawtooth', gain: 0.08, slide: 3 });
+    this.tone(990, 0.35, { type: 'sine', gain: 0.14, delay: 0.1 });
+  }
+
+  shield() {
+    this.tone(220, 0.8, { type: 'sine', gain: 0.25, slide: 4 });
+    this.noise(0.8, { freq: 5000, q: 6, gain: 0.12, type: 'bandpass', sweep: 0.3 });
+  }
+
+  deflect() {
+    this.tone(1400, 0.25, { type: 'triangle', gain: 0.15, slide: 0.5 });
+    this.noise(0.25, { freq: 4000, q: 3, gain: 0.15, type: 'bandpass', sweep: 0.5 });
+  }
+
+  siren() {
+    for (let i = 0; i < 3; i++) {
+      this.tone(520, 0.45, { type: 'sawtooth', gain: 0.07, delay: i * 0.9, slide: 1.6 });
+      this.tone(830, 0.4, { type: 'sawtooth', gain: 0.07, delay: i * 0.9 + 0.45, slide: 0.62 });
+    }
+  }
+
+  zone() {
+    [0, 7, 12, 19].forEach((s, i) => this.tone(220 * Math.pow(2, s / 12), 1.6, { type: 'sine', gain: 0.1, delay: i * 0.14 }));
   }
 
   milestone() {

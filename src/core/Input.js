@@ -1,9 +1,12 @@
 import { WORLD } from '../config.js';
 import { clamp } from './math.js';
 
+const STEER_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'];
+
 // Maps mouse, touch and keyboard to a steering target on the tunnel's
-// cross-section disc. Mouse steers absolutely (cursor position = probe
-// position); touch steers relatively so the finger never covers the probe.
+// cross-section disc, plus the two abilities. Mouse steers absolutely
+// (cursor position = probe position); touch steers relatively so the finger
+// never covers the probe.
 export class Input {
   constructor(el) {
     this.el = el;
@@ -12,7 +15,11 @@ export class Input {
     this.keys = new Set();
     this.touchId = null;
     this.last = null;
+    this.boostHeld = false;
+    this.boostTouch = false;
     this.onPause = null;
+    this.onShield = null;
+    this.onCamera = null;
 
     el.addEventListener('pointermove', (e) => this.pointer(e));
     el.addEventListener('pointerdown', (e) => {
@@ -28,14 +35,39 @@ export class Input {
 
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
+      if (e.repeat && !STEER_KEYS.includes(k)) return;
       if (k === 'escape' || k === 'p') { this.onPause?.(); return; }
-      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'].includes(k)) {
+      if (k === 'e' || k === 'q') { this.onShield?.(); return; }
+      if (k === 'c' || k === 'v') { this.onCamera?.(); return; }
+      if (k === ' ' || k === 'shift') {
+        this.boostHeld = true;
+        if (e.target === document.body || e.target === el) e.preventDefault();
+        return;
+      }
+      if (STEER_KEYS.includes(k)) {
         this.keys.add(k);
         e.preventDefault();
       }
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('keyup', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === ' ' || k === 'shift') this.boostHeld = false;
+      this.keys.delete(k);
+    });
+    window.addEventListener('blur', () => { this.keys.clear(); this.boostHeld = false; this.boostTouch = false; });
+  }
+
+  get boost() { return this.boostHeld || this.boostTouch; }
+
+  // On-screen buttons for touch devices.
+  bindTouchButtons(boostBtn, shieldBtn) {
+    const on = (e) => { e.preventDefault(); this.boostTouch = true; boostBtn.classList.add('held'); };
+    const off = () => { this.boostTouch = false; boostBtn.classList.remove('held'); };
+    boostBtn.addEventListener('pointerdown', on);
+    boostBtn.addEventListener('pointerup', off);
+    boostBtn.addEventListener('pointercancel', off);
+    boostBtn.addEventListener('pointerleave', off);
+    shieldBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onShield?.(); });
   }
 
   pointer(e) {

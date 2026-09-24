@@ -4,9 +4,13 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { FXAAPass } from 'three/addons/postprocessing/FXAAPass.js';
 
-// Heat shimmer, chromatic aberration, vignette and grain, applied in linear HDR
-// before tone mapping so the bloom and the fringing share the same highlights.
+// One full-screen pass in linear HDR, before tone mapping:
+//  · crepuscular rays streaming from the photosphere's screen position,
+//  · a radial zoom blur while boosting,
+//  · heat shimmer, chromatic aberration,
+//  · alarm (red) and magnetic shield (cyan) edge tints, vignette and grain.
 const LensShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -16,6 +20,11 @@ const LensShader = {
     uVignette: { value: 1.1 },
     uFlash: { value: 0 },
     uAspect: { value: 1 },
+    uSun: { value: new Vector2(0.5, 0.5) },
+    uRays: { value: 0 },
+    uZoom: { value: 0 },
+    uAlarm: { value: 0 },
+    uShield: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -23,7 +32,8 @@ const LensShader = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
-    uniform float uTime, uAberration, uShimmer, uVignette, uFlash, uAspect;
+    uniform float uTime, uAberration, uShimmer, uVignette, uFlash, uAspect, uRays, uZoom, uAlarm, uShield;
+    uniform vec2 uSun;
     varying vec2 vUv;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
@@ -31,6 +41,7 @@ const LensShader = {
       vec2 c = uv - 0.5;
       c.x *= uAspect;
       float r = length(c);
+      float jitter = hash(uv * 731.0 + fract(uTime * 7.0));
 
       // Rising-air shimmer, strongest at the edges of the frame.
       uv += uShimmer * r * vec2(
@@ -44,9 +55,44 @@ const LensShader = {
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv - dir).b;
 
+      // Zoom blur toward the centre while boosting.
+      if (uZoom > 0.001) {
+        vec3 acc = vec3(0.0);
+        for (int i = 1; i <= 8; i++) {
+          float k = (float(i) + jitter) / 8.0;
+          acc += texture2D(tDiffuse, mix(uv, vec2(0.5), k * uZoom * 0.12)).rgb;
+        }
+        col = mix(col, acc / 8.0, clamp(uZoom * r * 1.6, 0.0, 0.85));
+      }
+
+      // Crepuscular rays: march toward the sun, accumulating bright samples.
+      if (uRays > 0.001) {
+        vec2 toSun = (uSun - uv) / 18.0;
+        vec2 p = uv + toSun * jitter;
+        float decay = 1.0;
+        vec3 rays = vec3(0.0);
+        for (int i = 0; i < 18; i++) {
+          vec3 s = texture2D(tDiffuse, p).rgb;
+          // Only the photosphere emits shafts: mask samples to the sun's disc,
+          // so anything drawn in front of it (hazards, the probe, the canopy)
+          // casts a shadow ray instead of glowing on its own.
+          vec2 fromSun = (p - uSun) * vec2(uAspect, 1.0);
+          float disc = smoothstep(0.22, 0.04, length(fromSun));
+          float l = max(dot(s, vec3(0.3, 0.5, 0.2)) - 1.0, 0.0) * disc;
+          rays += s * l * decay;
+          decay *= 0.94;
+          p += toSun;
+        }
+        col += rays * uRays * 0.03;
+      }
+
+      float edge = smoothstep(0.35, 1.0, r);
+      col = mix(col, vec3(1.4, 0.08, 0.04) * (0.6 + 0.4 * sin(uTime * 12.0)), uAlarm * edge * 0.5);
+      col += vec3(0.25, 0.9, 1.0) * uShield * edge * 0.35;
+
       col *= 1.0 - smoothstep(0.35, 1.25, r * uVignette);
       col += vec3(1.0, 0.45, 0.25) * uFlash;
-      col += (hash(uv * 900.0 + fract(uTime)) - 0.5) * 0.035;
+      col += (jitter - 0.5) * 0.035;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }
   `,
@@ -61,6 +107,8 @@ export class PostFX {
     this.lens = new ShaderPass(LensShader);
     this.composer.addPass(this.lens);
     this.composer.addPass(new OutputPass());
+    this.fxaa = new FXAAPass();
+    this.composer.addPass(this.fxaa);
   }
 
   setSize(w, h, pixelRatio) {
@@ -69,13 +117,18 @@ export class PostFX {
     this.lens.uniforms.uAspect.value = w / h;
   }
 
-  update(time, { aberration, shimmer, flash, bloom }) {
+  update(time, p) {
     const u = this.lens.uniforms;
     u.uTime.value = time;
-    u.uAberration.value = aberration;
-    u.uShimmer.value = shimmer;
-    u.uFlash.value = flash;
-    this.bloom.strength = bloom;
+    u.uAberration.value = p.aberration;
+    u.uShimmer.value = p.shimmer;
+    u.uFlash.value = p.flash;
+    u.uRays.value = p.rays;
+    u.uSun.value.copy(p.sun);
+    u.uZoom.value = p.zoom;
+    u.uAlarm.value = p.alarm;
+    u.uShield.value = p.shield;
+    this.bloom.strength = p.bloom;
   }
 
   render(dt) {

@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0b0507">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;600&display=swap">
 </head>
 <body>
 <!-- app:start -->
@@ -20,6 +20,7 @@
       <div class="readout">
         <span class="label">Distância ao centro do Sol</span>
         <span class="value xl"><span id="hud-depth">20,00</span><small>R☉</small></span>
+        <span class="zone-name" id="hud-zone">Vento solar</span>
         <div class="parker" aria-hidden="true">
           <div class="parker-track"><div class="parker-fill" id="hud-parker-fill"></div></div>
           <span class="parker-label" id="hud-parker">Parker 9,86 R☉</span>
@@ -32,29 +33,55 @@
       </div>
     </div>
 
-    <div class="toasts" id="toasts" aria-live="polite"></div>
+    <div class="hud-mid">
+      <div class="divemap" id="divemap" aria-hidden="true">
+        <div class="divemap-track" id="divemap-track"></div>
+      </div>
+      <div class="toasts" id="toasts" aria-live="polite"></div>
+      <canvas class="radar" id="radar" width="320" height="320" aria-label="Radar dos próximos obstáculos"></canvas>
+    </div>
 
     <div class="hud-bottom">
       <div class="readout">
         <span class="label">Velocidade</span>
         <span class="value md"><span id="hud-speed">122</span><small>km/s</small></span>
       </div>
-      <div class="heat">
-        <div class="heat-head">
-          <span class="label">Escudo térmico</span>
-          <span class="value sm" id="hud-shield">540 °C</span>
+      <div class="meters">
+        <div class="meter heat">
+          <div class="meter-head">
+            <span class="label">Escudo térmico</span>
+            <span class="value sm" id="hud-shield">540 °C</span>
+          </div>
+          <div class="meter-bar"><div class="meter-fill heat-fill" id="hud-heat"></div></div>
         </div>
-        <div class="heat-bar"><div class="heat-fill" id="hud-heat"></div></div>
+        <div class="meter energy">
+          <div class="meter-head">
+            <span class="label">Energia <kbd class="hint">Espaço</kbd> impulso <kbd class="hint">E</kbd> escudo</span>
+            <span class="value sm" id="hud-energy">40%</span>
+          </div>
+          <div class="meter-bar"><div class="meter-fill energy-fill" id="hud-energy-bar"></div><div class="meter-mark"></div></div>
+        </div>
       </div>
       <div class="readout align-end">
-        <span class="label">Coroa</span>
-        <span class="value md"><span id="hud-corona">0,9</span><small>MK</small></span>
+        <span class="label">Luz solar</span>
+        <span class="value md"><span id="hud-sun">116</span><small>× Terra</small></span>
       </div>
     </div>
+
+    <div class="storm" id="storm" hidden>
+      <span class="storm-title">Ejeção de massa coronal</span>
+      <span class="storm-sub" id="storm-sub">Impacto em 3 s · procure a brecha</span>
+    </div>
+  </div>
+
+  <div class="touch-controls" id="touch-controls" hidden>
+    <button type="button" id="btn-boost" class="touch-btn boost" aria-label="Impulso (segure)">Impulso</button>
+    <button type="button" id="btn-shieldx" class="touch-btn shield" aria-label="Escudo magnético">Escudo</button>
   </div>
 
   <div class="corner-controls">
     <button type="button" id="btn-pause" class="ghost" hidden>Pausar</button>
+    <button type="button" id="btn-camera" class="ghost">Cabine</button>
     <button type="button" id="btn-sound" class="ghost" aria-pressed="true">Som ligado</button>
   </div>
 
@@ -62,17 +89,28 @@
     <div class="screen-inner">
       <p class="eyebrow">Missão Ícaro-1 · coroa solar</p>
       <h1 class="title">Mergulho<br>Solar</h1>
-      <p class="lede">Pilote uma sonda pela coroa do Sol. Desvie dos arcos e filamentos de plasma, colete criocélulas para resfriar o escudo e chegue mais perto da estrela do que a Parker Solar Probe, que passou a 9,86 raios solares do centro em dezembro de 2024.</p>
+      <p class="lede">Pilote uma sonda pelas quatro camadas da atmosfera do Sol: vento solar, coroa externa, coroa interna e cromosfera. Desvie do plasma, colete criocélulas para resfriar o escudo e chegue mais perto da estrela do que a Parker Solar Probe, que passou a 9,86 raios solares do centro em dezembro de 2024.</p>
       <div class="actions">
         <button type="button" id="btn-start" class="primary">Iniciar mergulho</button>
-        <span class="best" id="best-line"></span>
+        <div class="view-pick" role="radiogroup" aria-label="Câmera">
+          <button type="button" class="chip" data-view="chase" role="radio" aria-checked="true">3ª pessoa</button>
+          <button type="button" class="chip" data-view="cockpit" role="radio" aria-checked="false">Cabine</button>
+        </div>
       </div>
+      <p class="best" id="best-line"></p>
       <dl class="legend">
-        <div><dt><i class="swatch plasma"></i>Plasma</dt><dd>Arcos, filamentos e plasmoides aquecem o escudo em 30%.</dd></div>
+        <div><dt><i class="swatch plasma"></i>Plasma</dt><dd>Arcos, filamentos, plasmoides e espículas aquecem o escudo em 30% e trincam o vidro da cabine.</dd></div>
         <div><dt><i class="swatch coolant"></i>Criocélula</dt><dd>Resfria o escudo em 22% e aumenta o multiplicador.</dd></div>
-        <div><dt><i class="swatch graze"></i>Rasante</dt><dd>Passar raspando no plasma rende pontos e multiplicador.</dd></div>
+        <div><dt><i class="swatch cell"></i>Célula de energia</dt><dd>+35% de energia. Rasantes também carregam.</dd></div>
+        <div><dt><i class="swatch boost"></i>Impulso</dt><dd>Segure <kbd>Espaço</kbd>: 45% mais rápido e pontos em dobro, mas o escudo esquenta.</dd></div>
+        <div><dt><i class="swatch field"></i>Escudo magnético</dt><dd><kbd>E</kbd> gasta 60% de energia e desvia todo impacto por 3,5 s.</dd></div>
+        <div><dt><i class="swatch storm"></i>Ejeção coronal</dt><dd>Tempestades de plasmoides a cada minuto. Sobreviva para ganhar 3.000.</dd></div>
       </dl>
-      <p class="keys"><kbd>Mouse</kbd> ou <kbd>arraste o dedo</kbd> ou <kbd>WASD</kbd> para pilotar · <kbd>Esc</kbd> pausa</p>
+      <p class="keys"><kbd>Mouse</kbd> ou <kbd>arraste o dedo</kbd> ou <kbd>WASD</kbd> para pilotar · <kbd>C</kbd> troca a câmera · <kbd>Esc</kbd> pausa</p>
+      <div class="log" id="log" hidden>
+        <p class="eyebrow">Diário de bordo</p>
+        <ol id="log-list"></ol>
+      </div>
     </div>
   </section>
 
@@ -88,17 +126,19 @@
   </section>
 
   <section id="screen-over" class="screen" hidden>
-    <div class="screen-inner">
+    <div class="screen-inner wide">
       <p class="eyebrow" id="over-eyebrow">Telemetria final</p>
       <h2 class="title md" id="over-title">Escudo térmico rompido</h2>
       <p class="lede" id="over-verdict"></p>
       <dl class="stats">
         <div><dt>Menor distância</dt><dd id="st-depth">—</dd></div>
         <div><dt>Pontos</dt><dd id="st-score">—</dd></div>
+        <div><dt>Região alcançada</dt><dd id="st-zone">—</dd></div>
         <div><dt>Velocidade máxima</dt><dd id="st-speed">—</dd></div>
         <div><dt>Tempo de mergulho</dt><dd id="st-time">—</dd></div>
         <div><dt>Criocélulas</dt><dd id="st-cells">—</dd></div>
         <div><dt>Rasantes</dt><dd id="st-grazes">—</dd></div>
+        <div><dt>Tempestades</dt><dd id="st-storms">—</dd></div>
       </dl>
       <div class="actions">
         <button type="button" id="btn-retry" class="primary">Mergulhar de novo</button>
